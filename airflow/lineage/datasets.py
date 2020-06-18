@@ -77,6 +77,7 @@ class DataSet(object):
 
     def as_dict(self):
         attributes = dict(self._data)
+        print(self.qualified_name)
         attributes.update({"qualifiedName": self.qualified_name})
 
         env = Environment()
@@ -101,10 +102,11 @@ class DataSet(object):
 
 
 class DataBase(DataSet):
-    type_name = "dbStore"
-    attributes = ["dbStoreType", "storeUse", "source", "description", "userName",
-                  "storeUri", "operation", "startTime", "endTime", "commandlineOpts",
-                  "attribute_db"]
+    type_name = "rdbms_table"
+    attributes = ["name", "db"]
+
+    def __init__(self, name=None, data=None, **kwargs):
+        super(DataBase).__init__(name, data, **kwargs)
 
 
 class File(DataSet):
