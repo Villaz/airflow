@@ -34,7 +34,32 @@ _port = conf.get("atlas", "port")
 _host = conf.get("atlas", "host")
 
 
+def install_entity(func):
+    def wrapper(client, entity):
+        try:
+            client.entity_post.create(data={"entity": func(client, entity)})
+        except HttpError:
+            print("The entity" + entity['typeName'] + "already exists")
+    return wrapper
+
+
+@install_entity
+def install_rdbms_table(client, entity):
+    db = client.entity_unique_attribute('rdbms_db', qualifiedName=entity['attributes']['db'])
+    entity['attributes']['db'] = {"guid": db.entity['guid']}
+    return entity
+
+
+SUPPORTED_ENTITIES = {'rdbms_table': install_rdbms_table}
+
+
 class AtlasBackend(LineageBackend):
+
+    @staticmethod
+    def create_auxiliar_entities(client, entity):
+        SUPPORTED_ENTITIES[entity['typeName']](client, entity)
+
+
     @staticmethod
     def send_lineage(operator, inlets, outlets, context):
         client = Atlas(_host, port=_port, username=_username, password=_password)
@@ -54,10 +79,19 @@ class AtlasBackend(LineageBackend):
                     continue
 
                 entity.set_context(context)
-                client.entity_post.create(data={"entity": entity.as_dict()})
-                inlet_list.append({"typeName": entity.type_name,
+                entity = entity.as_dict()
+                if entity['typeName'] == 'rdbms_table':
+                    db = client.entity_unique_attribute('rdbms_db', qualifiedName=entity['attributes']['db'])
+                    entity['attributes']['db'] = {"guid": db.entity['guid']}
+                    try:
+                        client.entity_post.create(data={"entity": entity})
+                    except HttpError:
+                        print("The entity"+entity['typeName'] +"already exists" )
+                else:
+                    client.entity_post.create(data={"entity": entity})
+                inlet_list.append({"typeName": entity['typeName'],
                                    "uniqueAttributes": {
-                                       "qualifiedName": entity.qualified_name
+                                       "qualifiedName": entity['attributes']['qualifiedName']
                                    }})
 
         outlet_list = []
